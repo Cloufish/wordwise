@@ -1,0 +1,8 @@
+{
+    "package": "wordwise",
+    "name": "Wordwise",
+    "mod": 0,
+    "conflicts": [],
+    "min_point_version": 50,
+    "human_version": "0.1.0"
+}
