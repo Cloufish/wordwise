@@ -1,4 +1,4 @@
-"""Tools > Wordwise Settings... dialog: Pexels key + per-Note-Type profiles."""
+"""Tools > Wordwise Settings... dialog: image provider keys + per-Note-Type profiles."""
 
 from __future__ import annotations
 
@@ -40,9 +40,7 @@ def _profile_label(profile: dict) -> str:
     gender_field = profile.get("gender_field") or ""
     if gender_field:
         language_code = profile.get("gender_language") or gender.DEFAULT_LANGUAGE
-        language_label = gender.SUPPORTED_LANGUAGES.get(language_code)
-        language_label = language_label.label if language_label else language_code
-        label += f", gender: {gender_field} [{language_label}]"
+        label += f", gender: {gender_field} [{language_code}]"
     return label + ")"
 
 
@@ -62,9 +60,8 @@ class ProfileEditDialog(QDialog):
         self.image_search_field_combo = QComboBox()
         self.gender_field_combo = QComboBox()
 
-        self.gender_language_combo = QComboBox()
-        for spec in gender.SUPPORTED_LANGUAGES.values():
-            self.gender_language_combo.addItem(spec.label, spec.code)
+        self.gender_language_edit = QLineEdit()
+        self.gender_language_edit.setPlaceholderText("e.g. de, fr, es, ja, ru…")
 
         self.path_edit = QLineEdit()
         browse_btn = QPushButton("Browse…")
@@ -86,12 +83,12 @@ class ProfileEditDialog(QDialog):
         layout.addWidget(self.frequency_field_combo)
         layout.addWidget(QLabel("Image field (target):"))
         layout.addWidget(self.image_field_combo)
-        layout.addWidget(QLabel("Image search field (optional — e.g. an English translation;\nleave as \"(same as Word field)\" to search using the Word field):"))
+        layout.addWidget(QLabel("Image search field (optional — e.g. an English translation, since\nPexels/Pixabay tend to return better results in English; leave as\n\"(same as Word field)\" to search using the Word field):"))
         layout.addWidget(self.image_search_field_combo)
         layout.addWidget(QLabel("Gender field (optional — target field for noun gender):"))
         layout.addWidget(self.gender_field_combo)
-        layout.addWidget(QLabel("Gender language (which Wiktionary edition to look up the Word field in):"))
-        layout.addWidget(self.gender_language_combo)
+        layout.addWidget(QLabel("Gender language (ISO 639-1 code, e.g. \"de\" — used to look up the\nWord field on freedictionaryapi.com):"))
+        layout.addWidget(self.gender_language_edit)
         layout.addWidget(QLabel("Frequency list file (Hermit Dave .txt):"))
         layout.addLayout(path_row)
         layout.addWidget(buttons)
@@ -107,14 +104,12 @@ class ProfileEditDialog(QDialog):
                 self.profile.get("image_search_field") or _SAME_AS_WORD_FIELD
             )
             self.gender_field_combo.setCurrentText(self.profile.get("gender_field") or _NO_GENDER)
-            gender_language_index = self.gender_language_combo.findData(
-                self.profile.get("gender_language") or gender.DEFAULT_LANGUAGE
-            )
-            if gender_language_index >= 0:
-                self.gender_language_combo.setCurrentIndex(gender_language_index)
+            self.gender_language_edit.setText(self.profile.get("gender_language") or gender.DEFAULT_LANGUAGE)
             self.path_edit.setText(self.profile["frequency_list_path"])
-        elif self.note_type_combo.count():
-            self._reload_fields(self.note_type_combo.currentText())
+        else:
+            self.gender_language_edit.setText(gender.DEFAULT_LANGUAGE)
+            if self.note_type_combo.count():
+                self._reload_fields(self.note_type_combo.currentText())
 
     def _reload_fields(self, note_type_name: str) -> None:
         for combo in (
@@ -165,7 +160,7 @@ class ProfileEditDialog(QDialog):
             "image_field": self.image_field_combo.currentText(),
             "image_search_field": image_search_field,
             "gender_field": gender_field,
-            "gender_language": self.gender_language_combo.currentData() or gender.DEFAULT_LANGUAGE,
+            "gender_language": self.gender_language_edit.text().strip() or gender.DEFAULT_LANGUAGE,
             "frequency_list_path": self.path_edit.text().strip(),
         }
         self.accept()
@@ -179,8 +174,11 @@ class SettingsDialog(QDialog):
 
         self.cfg = config_schema.get_config()
 
-        self.api_key_edit = QLineEdit(self.cfg["pexels_api_key"])
-        self.api_key_edit.setEchoMode(QLineEdit.EchoMode.Password)
+        self.pexels_api_key_edit = QLineEdit(self.cfg["pexels_api_key"])
+        self.pexels_api_key_edit.setEchoMode(QLineEdit.EchoMode.Password)
+
+        self.pixabay_api_key_edit = QLineEdit(self.cfg["pixabay_api_key"])
+        self.pixabay_api_key_edit.setEchoMode(QLineEdit.EchoMode.Password)
 
         self.overwrite_checkbox = QCheckBox("Overwrite existing Frequency/Image field content when fetching")
         self.overwrite_checkbox.setChecked(self.cfg.get("overwrite_existing", False))
@@ -205,8 +203,10 @@ class SettingsDialog(QDialog):
         buttons.rejected.connect(self.reject)
 
         layout = QVBoxLayout()
-        layout.addWidget(QLabel("Pexels API key:"))
-        layout.addWidget(self.api_key_edit)
+        layout.addWidget(QLabel("Pexels API key (primary image source):"))
+        layout.addWidget(self.pexels_api_key_edit)
+        layout.addWidget(QLabel("Pixabay API key (fallback, used when Pexels finds nothing):"))
+        layout.addWidget(self.pixabay_api_key_edit)
         layout.addWidget(self.overwrite_checkbox)
         layout.addWidget(QLabel("Note Type profiles:"))
         layout.addWidget(self.profile_list)
@@ -244,7 +244,8 @@ class SettingsDialog(QDialog):
         self._reload_profile_list()
 
     def _save(self) -> None:
-        self.cfg["pexels_api_key"] = self.api_key_edit.text().strip()
+        self.cfg["pexels_api_key"] = self.pexels_api_key_edit.text().strip()
+        self.cfg["pixabay_api_key"] = self.pixabay_api_key_edit.text().strip()
         self.cfg["overwrite_existing"] = self.overwrite_checkbox.isChecked()
         config_schema.write_config(self.cfg)
         self.accept()

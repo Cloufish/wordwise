@@ -26,9 +26,17 @@ class FetchResult:
     gender_skipped_existing: bool = False
     gender_not_found: bool = False
     gender_error: Optional[str] = None
+    gender_cleared: bool = False
 
 
-def fetch_for_note(col, note: Note, profile: dict, api_key: str, overwrite: bool = False) -> FetchResult:
+def fetch_for_note(
+    col,
+    note: Note,
+    profile: dict,
+    pexels_api_key: str,
+    pixabay_api_key: str,
+    overwrite: bool = False,
+) -> FetchResult:
     result = FetchResult()
 
     word = (note[profile["word_field"]] or "").strip()
@@ -58,7 +66,7 @@ def fetch_for_note(col, note: Note, profile: dict, api_key: str, overwrite: bool
             image_query = (note[image_search_field] or "").strip() or word
         result.image_query = image_query
 
-        image_bytes, error = images.search_and_download(image_query, api_key)
+        image_bytes, error = images.search_and_download(image_query, pexels_api_key, pixabay_api_key)
         if image_bytes:
             filename = images.save_to_media(col, image_query, image_bytes)
             note[image_field] = f'<img src="{filename}">'
@@ -78,6 +86,9 @@ def fetch_for_note(col, note: Note, profile: dict, api_key: str, overwrite: bool
                 note[gender_field] = gender_value
                 result.gender_set = True
             else:
+                if note[gender_field] != "":
+                    note[gender_field] = ""
+                    result.gender_cleared = True
                 result.gender_not_found = True
                 result.gender_error = gender_err
 

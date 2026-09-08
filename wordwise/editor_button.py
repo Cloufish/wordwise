@@ -53,7 +53,9 @@ def _fetch_current_note(editor: Editor) -> None:
     overwrite = cfg.get("overwrite_existing", False)
     QueryOp(
         parent=editor.parentWindow,
-        op=lambda col: fetcher.fetch_for_note(col, note, profile, cfg["pexels_api_key"], overwrite=overwrite),
+        op=lambda col: fetcher.fetch_for_note(
+            col, note, profile, cfg["pexels_api_key"], cfg["pixabay_api_key"], overwrite=overwrite
+        ),
         success=lambda result: _on_success(editor, result),
     ).with_progress("Wordwise: fetching frequency, image & gender…").run_in_background()
 
